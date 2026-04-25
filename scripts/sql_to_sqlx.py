@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PARTITION_PATTERN = re.compile(
-    r"PARTITION\s+BY\s+(?P<expr>[^\n;)]+?)(?=\s*(?:CLUSTER\s+BY|OPTIONS|AS|;|$))",
+    r"PARTITION\s+BY\s+(?P<expr>[^\n;]+?)(?=\s*(?:CLUSTER\s+BY|OPTIONS|AS|;|$))",
     re.IGNORECASE,
 )
 CLUSTER_PATTERN = re.compile(
