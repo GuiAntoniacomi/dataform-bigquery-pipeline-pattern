@@ -23,9 +23,6 @@ jobs:
       - name: Install Dataform CLI
         run: npm install -g @dataform/cli@^3.0.0
 
-      - name: Install project dependencies
-        run: dataform install
-
       - name: Compile Dataform project
         # `dataform compile` resolves every ${ref()} and validates the DAG.
         # If a ref points at a non-existent table, this step fails the PR.
