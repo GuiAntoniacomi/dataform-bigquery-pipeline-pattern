@@ -5,7 +5,6 @@ on:
     paths:
       - "definitions/**"
       - "workflow_settings.yaml"
-      - "package.json"
   push:
     branches: [main, master]
 
