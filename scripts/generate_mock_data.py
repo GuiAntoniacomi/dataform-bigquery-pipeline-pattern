@@ -149,21 +149,44 @@ def write_orders_and_items(
     now = datetime.now(UTC)
     eligible_stores = [s for s in stores if not s.is_dev and not s.is_excluded_from_dw]
 
-    with orders_path.open("w", newline="", encoding="utf-8") as o_file, \
-         items_path.open("w", newline="", encoding="utf-8") as i_file:
+    with (
+        orders_path.open("w", newline="", encoding="utf-8") as o_file,
+        items_path.open("w", newline="", encoding="utf-8") as i_file,
+    ):
         o = csv.writer(o_file)
         i = csv.writer(i_file)
 
-        o.writerow([
-            "id", "store_id", "customer_id", "currency_code", "total_price",
-            "discount", "net_amount", "channel", "status",
-            "created_at", "updated_at", "datastream_metadata.source_timestamp",
-        ])
-        i.writerow([
-            "id", "order_id", "product_id", "quantity", "unit_price",
-            "net_amount", "default_code", "is_recommended",
-            "created_at", "updated_at", "datastream_metadata.source_timestamp",
-        ])
+        o.writerow(
+            [
+                "id",
+                "store_id",
+                "customer_id",
+                "currency_code",
+                "total_price",
+                "discount",
+                "net_amount",
+                "channel",
+                "status",
+                "created_at",
+                "updated_at",
+                "datastream_metadata.source_timestamp",
+            ]
+        )
+        i.writerow(
+            [
+                "id",
+                "order_id",
+                "product_id",
+                "quantity",
+                "unit_price",
+                "net_amount",
+                "default_code",
+                "is_recommended",
+                "created_at",
+                "updated_at",
+                "datastream_metadata.source_timestamp",
+            ]
+        )
 
         for _ in range(num_orders):
             store = rng.choice(eligible_stores)
@@ -208,29 +231,33 @@ def write_orders_and_items(
             # 8% of orders get a duplicate CDC event with a newer source_timestamp.
             # Silver must keep only the latest per id (ROW_NUMBER dedup).
             if rng.random() < 0.08:
-                o.writerow([
-                    *order_row[:-1],
-                    (source_ts + timedelta(seconds=rng.randint(60, 3600))).isoformat(),
-                ])
+                o.writerow(
+                    [
+                        *order_row[:-1],
+                        (source_ts + timedelta(seconds=rng.randint(60, 3600))).isoformat(),
+                    ]
+                )
 
             for line_idx in range(num_items):
                 item_id = str(uuid.UUID(int=rng.getrandbits(128)))
                 # 0.5% missing product_id — silver must SAFE_CAST and tolerate.
                 product_id = "" if rng.random() < 0.005 else rng.randint(100, 999)
                 line_net = round(line_totals[line_idx] * (1 - discount / max(gross, 0.01)), 2)
-                i.writerow([
-                    item_id,
-                    order_id,
-                    product_id,
-                    quantities[line_idx],
-                    unit_prices[line_idx],
-                    line_net,
-                    f"SKU-{rng.randint(1000, 9999)}",
-                    rng.random() < 0.18,  # ~18% of items are model-recommended
-                    created_at.isoformat(),
-                    created_at.isoformat(),
-                    source_ts.isoformat(),
-                ])
+                i.writerow(
+                    [
+                        item_id,
+                        order_id,
+                        product_id,
+                        quantities[line_idx],
+                        unit_prices[line_idx],
+                        line_net,
+                        f"SKU-{rng.randint(1000, 9999)}",
+                        rng.random() < 0.18,  # ~18% of items are model-recommended
+                        created_at.isoformat(),
+                        created_at.isoformat(),
+                        source_ts.isoformat(),
+                    ]
+                )
 
 
 def write_currencies(path: Path) -> None:

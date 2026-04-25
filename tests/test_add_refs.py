@@ -79,7 +79,7 @@ class TestFindAndApplyReplacements:
         assert replacements[0].after == '${ref("orders_clean")}'
 
         updated = apply_replacements(content, pattern)
-        assert "${ref(\"orders_clean\")}" in updated
+        assert '${ref("orders_clean")}' in updated
         assert "`proj.silver.orders_clean`" not in updated
 
     def test_skips_config_block_references(self) -> None:

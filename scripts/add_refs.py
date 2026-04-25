@@ -80,7 +80,7 @@ def is_already_ref(text: str, match_start: int, match_end: int) -> bool:
     window_start = max(0, match_start - 16)
     window_end = min(len(text), match_end + 4)
     window = text[window_start:window_end]
-    return "${ref(" in window and ")}" in window[match_end - window_start:]
+    return "${ref(" in window and ")}" in window[match_end - window_start :]
 
 
 def find_replacements(content: str, pattern: re.Pattern[str], file: Path) -> list[Replacement]:
@@ -104,6 +104,7 @@ def find_replacements(content: str, pattern: re.Pattern[str], file: Path) -> lis
 
 def apply_replacements(content: str, pattern: re.Pattern[str]) -> str:
     """Apply the same logic as find_replacements but return the new content."""
+
     def _sub(match: re.Match[str]) -> str:
         text = match.string
         if is_inside_config_block(text, match.start()):
