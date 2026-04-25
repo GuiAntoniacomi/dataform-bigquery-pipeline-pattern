@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "my-gcp-project",
+  schema: "raw",
+  name: "order_items",
+  description: "Source order_items table from Datastream CDC. High volume — incremental processing required. Uses MERGE on order_item_id with a 7-day retroactive window to absorb late-arriving rows."
+}

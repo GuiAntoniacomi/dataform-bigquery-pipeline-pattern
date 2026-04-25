@@ -1,0 +1,36 @@
+[project]
+name = "dataform-bigquery-pipeline-pattern"
+version = "1.0.0"
+description = "Pattern repository for BigQuery Dataform migrations with A/B/C/D validation."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Guilherme Antoniacomi" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.4",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"

@@ -1,0 +1,37 @@
+config {
+  type: "table",
+  schema: "silver",
+  name: "stores_clean",
+  description: "Cleaned and type-safe stores dimension. Filters out test/dev stores and stores explicitly excluded from analytics.",
+  bigquery: {
+    clusterBy: ["country_code", "store_id"]
+  },
+  tags: ["silver", "dim", "core"]
+}
+
+WITH ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY id
+      ORDER BY datastream_metadata.source_timestamp DESC
+    ) AS rn
+  FROM ${ref("stores")}
+  WHERE datastream_metadata.source_timestamp IS NOT NULL
+)
+SELECT
+  SAFE_CAST(id AS INT64)              AS store_id,
+  SAFE_CAST(name AS STRING)           AS store_name,
+  SAFE_CAST(country_code AS STRING)   AS country_code,
+  SAFE_CAST(currency_code AS STRING)  AS currency_code,
+  SAFE_CAST(timezone AS STRING)       AS timezone,
+  SAFE_CAST(is_franchise AS BOOL)     AS is_franchise,
+  SAFE_CAST(opening_date AS DATE)     AS opening_date,
+  SAFE_CAST(created_at AS TIMESTAMP)  AS created_at,
+  SAFE_CAST(updated_at AS TIMESTAMP)  AS updated_at
+FROM ranked
+WHERE rn = 1
+  -- Operational filters: exclude test stores and explicitly excluded stores.
+  -- These flags exist precisely so that analytics never sees QA traffic.
+  AND COALESCE(SAFE_CAST(is_dev AS BOOL), FALSE) = FALSE
+  AND COALESCE(SAFE_CAST(is_excluded_from_dw AS BOOL), FALSE) = FALSE

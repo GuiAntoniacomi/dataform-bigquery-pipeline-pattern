@@ -1,0 +1,32 @@
+name: dataform-compile
+
+on:
+  pull_request:
+    paths:
+      - "definitions/**"
+      - "workflow_settings.yaml"
+      - "package.json"
+  push:
+    branches: [main, master]
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dataform CLI
+        run: npm install -g @dataform/cli@^3.0.0
+
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Compile Dataform project
+        # `dataform compile` resolves every ${ref()} and validates the DAG.
+        # If a ref points at a non-existent table, this step fails the PR.
+        run: dataform compile --json

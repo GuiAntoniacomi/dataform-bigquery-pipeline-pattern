@@ -1,0 +1,10 @@
+defaultProject: my-gcp-project
+defaultLocation: US
+defaultDataset: dataform
+defaultAssertionDataset: dataform_assertions
+dataformCoreVersion: 3.0.0
+
+# Variables override per environment.
+# Example: dataform run --vars=env=prod
+vars:
+  env: dev

@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "my-gcp-project",
+  schema: "raw",
+  name: "orders",
+  description: "Source orders table populated by Datastream CDC. Contains duplicates (one row per CDC event) and late-arriving rows. Must be deduplicated downstream using ROW_NUMBER() over datastream_metadata.source_timestamp."
+}

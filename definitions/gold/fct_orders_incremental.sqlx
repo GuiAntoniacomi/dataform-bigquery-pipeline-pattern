@@ -1,0 +1,100 @@
+config {
+  type: "operations",
+  schema: "gold",
+  name: "fct_orders_incremental_merge",
+  description: "Incremental MERGE counterpart to fct_orders. Runs every 2 hours, processes a 30-day rolling window, and upserts on order_id. The full-refresh fct_orders runs monthly as a drift safeguard. This dual-pipeline pattern (intentional duplication) is documented in docs/incremental-strategy.md — both files must be kept in sync when business rules change.",
+  hasOutput: true,
+  tags: ["gold", "fct", "incremental"]
+}
+
+-- =============================================================================
+-- Idempotent MERGE — safe to re-run within the rolling window without
+-- producing duplicates. The MATCHED clause updates existing rows; the
+-- NOT MATCHED clause inserts new ones.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS ${self()} (
+  order_id              STRING,
+  store_id              INT64,
+  customer_id           INT64,
+  channel               STRING,
+  status                STRING,
+  currency_code         STRING,
+  total_price_local     NUMERIC,
+  discount_local        NUMERIC,
+  net_amount_local      NUMERIC,
+  total_price_usd       NUMERIC,
+  discount_usd          NUMERIC,
+  net_amount_usd        NUMERIC,
+  item_count            INT64,
+  total_quantity        INT64,
+  recommended_item_count INT64,
+  created_at            TIMESTAMP,
+  updated_at            TIMESTAMP
+)
+PARTITION BY DATE(created_at)
+CLUSTER BY store_id, customer_id;
+
+MERGE ${self()} T
+USING (
+  SELECT
+    o.order_id,
+    o.store_id,
+    o.customer_id,
+    o.channel,
+    o.status,
+    o.currency_code,
+    o.total_price_local,
+    o.discount_local,
+    o.net_amount_local,
+    o.total_price_usd,
+    o.discount_usd,
+    o.net_amount_usd,
+    COALESCE(items.item_count, 0)        AS item_count,
+    COALESCE(items.total_quantity, 0)    AS total_quantity,
+    COALESCE(items.recommended_count, 0) AS recommended_item_count,
+    o.created_at,
+    o.updated_at
+  FROM ${ref("orders_clean")} o
+  LEFT JOIN (
+    SELECT
+      order_id,
+      COUNT(*)                                            AS item_count,
+      SUM(quantity)                                       AS total_quantity,
+      SUM(CASE WHEN is_recommended THEN 1 ELSE 0 END)     AS recommended_count
+    FROM ${ref("order_items_clean")}
+    WHERE created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+    GROUP BY order_id
+  ) items USING (order_id)
+  WHERE o.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+) S
+ON  T.order_id = S.order_id
+AND DATE(T.created_at) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+WHEN MATCHED THEN UPDATE SET
+  store_id              = S.store_id,
+  customer_id           = S.customer_id,
+  channel               = S.channel,
+  status                = S.status,
+  currency_code         = S.currency_code,
+  total_price_local     = S.total_price_local,
+  discount_local        = S.discount_local,
+  net_amount_local      = S.net_amount_local,
+  total_price_usd       = S.total_price_usd,
+  discount_usd          = S.discount_usd,
+  net_amount_usd        = S.net_amount_usd,
+  item_count            = S.item_count,
+  total_quantity        = S.total_quantity,
+  recommended_item_count = S.recommended_item_count,
+  updated_at            = S.updated_at
+WHEN NOT MATCHED THEN INSERT (
+  order_id, store_id, customer_id, channel, status, currency_code,
+  total_price_local, discount_local, net_amount_local,
+  total_price_usd, discount_usd, net_amount_usd,
+  item_count, total_quantity, recommended_item_count,
+  created_at, updated_at
+) VALUES (
+  S.order_id, S.store_id, S.customer_id, S.channel, S.status, S.currency_code,
+  S.total_price_local, S.discount_local, S.net_amount_local,
+  S.total_price_usd, S.discount_usd, S.net_amount_usd,
+  S.item_count, S.total_quantity, S.recommended_item_count,
+  S.created_at, S.updated_at
+);

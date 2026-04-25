@@ -1,0 +1,47 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "fct_orders",
+  description: "Full-refresh fact table for orders. Built monthly as a sanity baseline and as the cutover target for the incremental MERGE counterpart (fct_orders_incremental).",
+  bigquery: {
+    partitionBy: "DATE(created_at)",
+    clusterBy: ["store_id", "customer_id"]
+  },
+  tags: ["gold", "fct", "monthly_refresh"]
+}
+
+SELECT
+  o.order_id,
+  o.store_id,
+  o.customer_id,
+  o.channel,
+  o.status,
+
+  -- Monetary fields: keep BOTH local and USD. Local is what the operation
+  -- transacted; USD is what finance consolidates against. Never drop one for
+  -- the other — every monetary field travels in pairs.
+  o.currency_code,
+  o.total_price_local,
+  o.discount_local,
+  o.net_amount_local,
+  o.total_price_usd,
+  o.discount_usd,
+  o.net_amount_usd,
+
+  -- Item-level rollups for ticket-size analytics, joined at order grain.
+  COALESCE(items.item_count, 0)            AS item_count,
+  COALESCE(items.total_quantity, 0)        AS total_quantity,
+  COALESCE(items.recommended_count, 0)     AS recommended_item_count,
+
+  o.created_at,
+  o.updated_at
+FROM ${ref("orders_clean")} o
+LEFT JOIN (
+  SELECT
+    order_id,
+    COUNT(*)                                                          AS item_count,
+    SUM(quantity)                                                     AS total_quantity,
+    SUM(CASE WHEN is_recommended THEN 1 ELSE 0 END)                   AS recommended_count
+  FROM ${ref("order_items_clean")}
+  GROUP BY order_id
+) items USING (order_id)

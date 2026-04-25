@@ -1,0 +1,50 @@
+config {
+  type: "incremental",
+  schema: "silver",
+  name: "order_items_clean",
+  description: "Incremental MERGE of order_items with a 7-day retroactive window to absorb late-arriving CDC rows. Validated via the A/B/C/D pattern (see validation_queries/02_incremental_simulation.sql) before being cut over from full-refresh.",
+  uniqueKey: ["order_item_id"],
+  bigquery: {
+    partitionBy: "DATE(created_at)",
+    clusterBy: ["order_id"],
+    // updatePartitionFilter keeps the MERGE scan cheap by limiting it to the
+    // last 14 days of partitions. Combined with the 7-day source window below,
+    // this means a worst-case late row is absorbed within the partition window.
+    updatePartitionFilter: "created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY)"
+  },
+  tags: ["silver", "fct", "incremental"]
+}
+
+WITH source AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY id
+      ORDER BY datastream_metadata.source_timestamp DESC
+    ) AS rn
+  FROM ${ref("order_items")}
+  WHERE datastream_metadata.source_timestamp IS NOT NULL
+
+  ${when(incremental(),
+    `-- Incremental window: re-read the last 7 days of source rows. The MERGE
+     -- key (order_item_id) ensures previously-seen rows are upserted, not
+     -- duplicated. Late arrivals up to 7 days are absorbed transparently.
+     AND created_at >= TIMESTAMP_SUB(
+       (SELECT COALESCE(MAX(created_at), TIMESTAMP("1970-01-01")) FROM ${self()}),
+       INTERVAL 7 DAY
+     )`
+  )}
+)
+SELECT
+  SAFE_CAST(id AS STRING)             AS order_item_id,
+  SAFE_CAST(order_id AS STRING)       AS order_id,
+  SAFE_CAST(product_id AS INT64)      AS product_id,
+  SAFE_CAST(quantity AS INT64)        AS quantity,
+  SAFE_CAST(unit_price AS NUMERIC)    AS unit_price_local,
+  SAFE_CAST(net_amount AS NUMERIC)    AS net_amount_local,
+  SAFE_CAST(default_code AS STRING)   AS default_code,
+  SAFE_CAST(is_recommended AS BOOL)   AS is_recommended,
+  SAFE_CAST(created_at AS TIMESTAMP)  AS created_at,
+  SAFE_CAST(updated_at AS TIMESTAMP)  AS updated_at
+FROM source
+WHERE rn = 1

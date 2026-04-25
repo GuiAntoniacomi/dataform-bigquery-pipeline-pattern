@@ -1,0 +1,10 @@
+{
+  "name": "dataform-bigquery-pipeline-pattern",
+  "version": "1.0.0",
+  "description": "Pattern repository for migrating BigQuery analytics pipelines to Dataform with explicit DAG, incremental loads, and A/B/C/D validation.",
+  "license": "MIT",
+  "author": "Guilherme Antoniacomi",
+  "dependencies": {
+    "@dataform/core": "3.0.0"
+  }
+}

@@ -1,0 +1,44 @@
+config {
+  type: "table",
+  schema: "gold",
+  name: "dim_stores",
+  description: "Store dimension for analytics consumption. Adds derived attributes (region, store_age_days, store_maturity) on top of the silver layer.",
+  bigquery: {
+    clusterBy: ["country_code", "store_id"]
+  },
+  tags: ["gold", "dim"]
+}
+
+SELECT
+  s.store_id,
+  s.store_name,
+  s.country_code,
+  s.currency_code,
+  s.timezone,
+  s.is_franchise,
+  s.opening_date,
+
+  -- Region grouping is a business rule. Centralized here so analytics never
+  -- has to redefine "what is APAC?". Add to this list when expanding markets.
+  CASE
+    WHEN s.country_code IN ('BR', 'AR', 'CL', 'CO', 'MX', 'PE', 'UY')              THEN 'LATAM'
+    WHEN s.country_code IN ('US', 'CA')                                            THEN 'NA'
+    WHEN s.country_code IN ('GB', 'IE', 'FR', 'DE', 'IT', 'ES', 'PT', 'CZ', 'RS')  THEN 'EMEA'
+    WHEN s.country_code IN ('JP', 'KR', 'SG', 'MY', 'TH', 'ID', 'PH', 'VN', 'KZ')  THEN 'APAC'
+    ELSE 'Other'
+  END AS region,
+
+  DATE_DIFF(CURRENT_DATE(), s.opening_date, DAY) AS store_age_days,
+
+  -- Maturity bucket. Thresholds are documented in docs/architecture.md so a
+  -- non-engineer can see why "Mature" starts at 730 days and not 365.
+  CASE
+    WHEN DATE_DIFF(CURRENT_DATE(), s.opening_date, DAY) <  90  THEN 'Ramp-Up'
+    WHEN DATE_DIFF(CURRENT_DATE(), s.opening_date, DAY) <  365 THEN 'Young'
+    WHEN DATE_DIFF(CURRENT_DATE(), s.opening_date, DAY) <  730 THEN 'Mature'
+    ELSE                                                            'Established'
+  END AS store_maturity,
+
+  s.created_at,
+  s.updated_at
+FROM ${ref("stores_clean")} s

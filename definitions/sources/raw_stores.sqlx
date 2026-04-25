@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "my-gcp-project",
+  schema: "raw",
+  name: "stores",
+  description: "Source stores table — slowly changing master data. Low volume; full-refresh is acceptable. Includes operational flags (is_dev, is_excluded_from_dw) used to filter test data out of analytics layers."
+}

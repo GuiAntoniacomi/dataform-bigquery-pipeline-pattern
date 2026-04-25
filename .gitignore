@@ -1,0 +1,37 @@
+# Dataform
+node_modules/
+.df-credentials.json
+definitions/_temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.python-version
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.local
+
+# Generated
+mock_data/*.csv
+mock_data/*.parquet
+
+# Logs
+*.log

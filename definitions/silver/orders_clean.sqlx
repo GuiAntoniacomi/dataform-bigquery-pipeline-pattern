@@ -1,0 +1,54 @@
+config {
+  type: "table",
+  schema: "silver",
+  name: "orders_clean",
+  description: "Deduplicated and type-safe orders, enriched with USD-converted monetary fields. One row per order_id.",
+  bigquery: {
+    partitionBy: "DATE(created_at)",
+    clusterBy: ["store_id", "customer_id"]
+  },
+  tags: ["silver", "fct", "core"]
+}
+
+js {
+  const { convertToUsd } = require("includes/helpers");
+}
+
+WITH ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY id
+      ORDER BY datastream_metadata.source_timestamp DESC
+    ) AS rn
+  FROM ${ref("orders")}
+  WHERE datastream_metadata.source_timestamp IS NOT NULL
+),
+deduped AS (
+  SELECT
+    SAFE_CAST(id AS STRING)             AS order_id,
+    SAFE_CAST(store_id AS INT64)        AS store_id,
+    SAFE_CAST(customer_id AS INT64)     AS customer_id,
+    SAFE_CAST(currency_code AS STRING)  AS currency_code,
+    SAFE_CAST(total_price AS NUMERIC)   AS total_price_local,
+    SAFE_CAST(discount AS NUMERIC)      AS discount_local,
+    SAFE_CAST(net_amount AS NUMERIC)    AS net_amount_local,
+    SAFE_CAST(channel AS STRING)        AS channel,
+    SAFE_CAST(status AS STRING)         AS status,
+    SAFE_CAST(created_at AS TIMESTAMP)  AS created_at,
+    SAFE_CAST(updated_at AS TIMESTAMP)  AS updated_at
+  FROM ranked
+  WHERE rn = 1
+)
+SELECT
+  o.* EXCEPT(currency_code, total_price_local, discount_local, net_amount_local),
+  o.currency_code,
+  o.total_price_local,
+  o.discount_local,
+  o.net_amount_local,
+  -- USD conversion via JS helper. The exchange rate snapshot is taken at the
+  -- order's created_at date so historical reporting stays stable across reruns.
+  ${convertToUsd("o.total_price_local", "o.currency_code", "DATE(o.created_at)")} AS total_price_usd,
+  ${convertToUsd("o.discount_local",    "o.currency_code", "DATE(o.created_at)")} AS discount_usd,
+  ${convertToUsd("o.net_amount_local",  "o.currency_code", "DATE(o.created_at)")} AS net_amount_usd
+FROM deduped o

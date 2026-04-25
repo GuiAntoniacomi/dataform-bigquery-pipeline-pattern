@@ -1,0 +1,7 @@
+config {
+  type: "declaration",
+  database: "my-gcp-project",
+  schema: "raw",
+  name: "currency_exchange_rates",
+  description: "Daily exchange rates per currency (BRL, USD, EUR, GBP, JPY, etc.). Used to convert all monetary fields into canonical USD in the silver layer. One row per (currency_code, exchange_date)."
+}
