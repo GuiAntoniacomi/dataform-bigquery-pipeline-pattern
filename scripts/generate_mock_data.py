@@ -29,7 +29,7 @@ import csv
 import random
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Reproducibility — the same seed always generates the same dataset.
@@ -82,7 +82,7 @@ def generate_stores(num_stores: int, rng: random.Random) -> list[Store]:
     for store_id in range(1, num_stores + 1):
         country_code, currency_code, tz = rng.choice(COUNTRIES)
         opening_offset_days = rng.randint(30, 5 * 365)
-        opening_date = (datetime.now(timezone.utc) - timedelta(days=opening_offset_days)).date()
+        opening_date = (datetime.now(UTC) - timedelta(days=opening_offset_days)).date()
         stores.append(
             Store(
                 store_id=store_id,
@@ -119,7 +119,7 @@ def write_stores(stores: list[Store], path: Path) -> None:
                 "datastream_metadata.source_timestamp",
             ]
         )
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for s in stores:
             writer.writerow(
                 [
@@ -146,7 +146,7 @@ def write_orders_and_items(
     items_path: Path,
     rng: random.Random,
 ) -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     eligible_stores = [s for s in stores if not s.is_dev and not s.is_excluded_from_dw]
 
     with orders_path.open("w", newline="", encoding="utf-8") as o_file, \
@@ -165,7 +165,7 @@ def write_orders_and_items(
             "created_at", "updated_at", "datastream_metadata.source_timestamp",
         ])
 
-        for order_idx in range(num_orders):
+        for _ in range(num_orders):
             store = rng.choice(eligible_stores)
             order_id = str(uuid.UUID(int=rng.getrandbits(128)))
             customer_id = rng.randint(1, 50_000)
@@ -176,7 +176,7 @@ def write_orders_and_items(
             num_items = rng.randint(1, 5)
             unit_prices = [round(rng.uniform(3.0, 35.0), 2) for _ in range(num_items)]
             quantities = [rng.randint(1, 3) for _ in range(num_items)]
-            line_totals = [u * q for u, q in zip(unit_prices, quantities)]
+            line_totals = [u * q for u, q in zip(unit_prices, quantities, strict=True)]
             gross = round(sum(line_totals), 2)
             discount = round(rng.uniform(0, gross * 0.20), 2)
             net = round(gross - discount, 2)
@@ -184,7 +184,9 @@ def write_orders_and_items(
             # Late-arriving simulation: 3% of orders show up in CDC up to 36h
             # after their created_at. Silver must absorb these via the 7-day
             # retroactive window.
-            late_offset = timedelta(hours=rng.randint(0, 36)) if rng.random() < 0.03 else timedelta(0)
+            late_offset = (
+                timedelta(hours=rng.randint(0, 36)) if rng.random() < 0.03 else timedelta(0)
+            )
             source_ts = created_at + late_offset
 
             order_row = [
@@ -233,7 +235,7 @@ def write_orders_and_items(
 
 def write_currencies(path: Path) -> None:
     """Write a 90-day rate snapshot per currency."""
-    now = datetime.now(timezone.utc).date()
+    now = datetime.now(UTC).date()
     with path.open("w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["currency_code", "exchange_date", "rate_to_usd"])
