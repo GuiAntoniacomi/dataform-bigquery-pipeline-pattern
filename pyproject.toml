@@ -1,9 +1,13 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dataform-bigquery-pipeline-pattern"
 version = "1.0.0"
 description = "Pattern repository for BigQuery Dataform migrations with A/B/C/D validation."
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Guilherme Antoniacomi" }]
 requires-python = ">=3.11"
 dependencies = []
@@ -13,6 +17,9 @@ dev = [
     "pytest>=7.4",
     "ruff>=0.4",
 ]
+
+[tool.setuptools]
+py-modules = []
 
 [tool.ruff]
 line-length = 100
